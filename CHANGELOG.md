@@ -2,6 +2,12 @@
 
 All notable changes to the Nizami Farms internal dashboard. Format: date · tab · what changed · why.
 
+## 2026-05-30 · cow · Cow species tab (mirrors mutton)
+
+Activated the Cow tab. Generalised the engine so mutton and cow share one code path: new `lib/animalData.ts` (`buildAnimalData(animal, days)`, replacing the mutton-only `lib/mutton.ts`), new `lib/animalConfig.ts` (`ANIMAL_CONFIG` — per-animal defaults, slider bounds, routing, copy, and a live-price-is-an-estimate flag), and `components/MuttonTool.tsx` → `components/ProcurementTool.tsx` split into a `ProcurementTool` parent (owns the species switch) and a parameterised `AnimalView` (remounted per species so inputs reset to that animal's defaults). `app/page.tsx` now builds both animals.
+
+Cow demand is real and larger than mutton (8,737 kg mapped over 180 days, 166 order-days; top cuts Keema, Boneless Boti, Nalli, Karahi, Undercut), so the tab is data-backed. But we never buy live/whole cow (every cow vendor purchase is a cut), so the in-house whole-cow cost (Rs 200k default) has no invoice anchor and is flagged in the UI as an unverified estimate. At that placeholder and 10% markup, in-house reads ~13% MORE expensive over 180 days. Decision (founder): mirror mutton and flag the estimate rather than reframe cow around its real per-cut vendor rates. See docs/spec/cow.md. Why generalise rather than duplicate: one engine means a fix to the math helps both animals and avoids a 700-line copy drifting out of sync.
+
 ## 2026-05-30 · procurement · Reverted real-invoice baseline experiment
 
 Reverted the real vendor invoice baseline (commit 98218c4) and returned the procurement tool to its retail × markup baseline. Why: founder opted to keep the original model rather than reframe the headline around real invoice rates. Removed lib/vendorRates.ts and the baseline-mode toggle. The data finding stands for the record (at real invoice rates ~Rs 2,463/kg, in-house slaughter is not cheaper at the current cost assumption), but it is no longer wired into the tool. One small carry-forward: the two `query<>` calls in lib/mutton.ts are kept explicitly typed (not `any`) so `next build` passes on Vercel; this is build hygiene, not a model change.

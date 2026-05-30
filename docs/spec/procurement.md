@@ -22,10 +22,14 @@ Top to bottom:
 6. "How the 90 days actually played out" — day strip of 90 squares, green if daily demand justified slaughter (≥75% of dressed carcass kg), amber otherwise. Hover tooltip per square shows date, kg demand, goats needed, decision.
 7. Methodology and data — bullet list at the bottom: window, Qurbani excluded count, unmapped SKUs, fat treatment.
 
+## Architecture note (2026-05-30)
+
+The tool was generalised when the Cow tab was added, so mutton and cow share one code path. Demand is built by `buildAnimalData(animal, days)` in lib/animalData.ts (replacing the old mutton-only lib/mutton.ts); per-animal UI defaults/routing/copy live in `lib/animalConfig.ts`; the component is `components/ProcurementTool.tsx` (parent `ProcurementTool` owns the species switch, `AnimalView` is the parameterised per-animal view). The mutton model, math, and defaults are unchanged by the refactor. See docs/spec/cow.md.
+
 ## Data sources
 
 - **MySQL operational database** (app.nizamifarms.com). Read-only access via lib/db.ts. Connection details in environment variables.
-- **Order lines table** filtered to last 90 days, mutton-only, excluding Qurbani patterns (regex match on /qurbani|aqeeqa|sadqa/ in SKU name or order line metadata).
+- **Order lines table** filtered to the window, per-species (mutton: `%Mutton%`/`%Bakra%`), excluding Qurbani patterns (regex match on /qurbani|aqeeqa|sadqa/ in SKU name or order line metadata).
 - **SKU-to-cut mapping** in lib/skuMap.ts. Maps raw Shopify SKU names to canonical cut categories (Karahi cut, Raan / Leg, Puth / Shoulder, etc.). Per-piece SKUs (Brain, Lungs, certain Chest cuts) are excluded from the kg model and noted in the methodology footer.
 - **Carcass yield table** in lib/cuts.ts. Canonical yield % per cut for a balanced mutton carcass at the default 30 kg live weight × 47% dressing yield = 14.1 kg dressed.
 - **Retail prices** in lib/retail.ts. Pulled from the Shopify storefront. Note: these are higher than real vendor invoice rates (mutton retail ~Rs 2,950-4,860/kg vs vendor invoices ~Rs 2,400-2,590/kg). This is a known caveat affecting the headline saving.

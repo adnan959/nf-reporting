@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { MuttonData } from "@/lib/mutton";
+import type { AnimalData } from "@/lib/animalData";
+import { ANIMAL_CONFIG, type AnimalConfig } from "@/lib/animalConfig";
+import type { Animal } from "@/lib/types";
 import { rs, kg, pct } from "@/lib/format";
 import { Settings, Lightbulb, ChevronDown, Shuffle } from "lucide-react";
 
@@ -20,16 +22,18 @@ const ROW_H = 50;  // identical data-row height so the two tables line up row-fo
 
 const sum = <T,>(a: T[], f: (t: T) => number) => a.reduce((s, x) => s + f(x), 0);
 
-// Operationally-sensible re-routing of over-supplied cuts into over-demanded ones.
-const ROUTES: { id: string; src: string; dst: string; desc: string }[] = [
-  { id: "shoulder_keema", src: "puth_shoulder", dst: "keema", desc: "Grind shoulder excess into mince" },
-  { id: "raanbl_keema", src: "raan_boneless", dst: "keema", desc: "Grind boneless excess" },
-  { id: "nalli_keema", src: "nalli_shank", dst: "keema", desc: "Debone shank, grind" },
-  { id: "chaap_karahi", src: "chaap_ribs", dst: "karahi", desc: "Mix ribs into karahi blend" },
-  { id: "fat_keema", src: "fat", dst: "keema", desc: "Add fat content to mince blend" },
-];
+type AnimalPair = { d90: AnimalData; d180: AnimalData };
 
-export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData }) {
+// Top-level tool: owns the species switch and renders the per-animal comparison.
+export function ProcurementTool({ mutton, cow }: { mutton: AnimalPair; cow: AnimalPair }) {
+  const [species, setSpecies] = useState<Animal>("mutton");
+  const pair = species === "mutton" ? mutton : cow;
+  // key={species} remounts the view on switch, resetting every per-animal input
+  // (markup, live cost, yields, routing) to that animal's defaults.
+  return <AnimalView key={species} species={species} setSpecies={setSpecies} config={ANIMAL_CONFIG[species]} d90={pair.d90} d180={pair.d180} />;
+}
+
+function AnimalView({ species, setSpecies, config, d90, d180 }: { species: Animal; setSpecies: (a: Animal) => void; config: AnimalConfig; d90: AnimalData; d180: AnimalData }) {
   const [windowDays, setWindowDays] = useState<90 | 180>(180);
   const data = windowDays === 90 ? d90 : d180;
   const [markup, setMarkup] = useState(10);
@@ -39,13 +43,13 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
   const [routeModal, setRouteModal] = useState(false);
   const [routing, setRouting] = useState<Record<string, number>>({}); // kg applied per route id
   const [conversionCost, setConversionCost] = useState(50); // Rs per kg routed (labour + grinding + repackaging)
-  const [live, setLive] = useState(35000); // all-in cost per mutton (purchase + raising + slaughter + transport)
+  const [live, setLive] = useState(config.defaultLivePrice); // all-in cost per animal (purchase + raising + slaughter + transport)
   const [canSell, setCanSell] = useState<Record<string, number>>({}); // kg of each leftover cut you can sell at retail
 
   // Carcass assumptions are now editable and drive every projection live.
   const defaultYields = useMemo(() => Object.fromEntries(data.cuts.map((c) => [c.key, c.yieldPct])), [data]);
-  const [liveWeight, setLiveWeight] = useState(30); // live animal weight (kg)
-  const [dressingPct, setDressingPct] = useState(47); // dressed carcass as % of live weight
+  const [liveWeight, setLiveWeight] = useState(config.defaultLiveWeight); // live animal weight (kg)
+  const [dressingPct, setDressingPct] = useState(config.defaultDressingPct); // dressed carcass as % of live weight
   const [yields, setYields] = useState<Record<string, number>>(() => ({ ...defaultYields }));
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null); // shared hover tooltip
 
@@ -94,7 +98,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
     for (const b of base) { remLeft[b.c.key] = b.leftover; remShort[b.c.key] = b.shortfall; }
     const routedIn: Record<string, number> = {};
     const routedOut: Record<string, number> = {};
-    const routeRows = ROUTES.map((rt) => {
+    const routeRows = config.routes.map((rt) => {
       const s = byKey[rt.src]; const d = byKey[rt.dst];
       const maxKg = s && d ? Math.max(0, Math.min(remLeft[rt.src], remShort[rt.dst])) : 0;
       const applied = Math.min(Math.max(0, routing[rt.id] ?? 0), maxKg);
@@ -144,7 +148,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
       totalCarcassSold90: sum(rows, (r) => r.carcassSold),
       totalLeftover90: sum(rows, (r) => r.leftover),
     };
-  }, [data, markup, overrides, live, canSell, N, carcassKg, yields, routing, conversionCost]);
+  }, [data, config, markup, overrides, live, canSell, N, carcassKg, yields, routing, conversionCost]);
 
   const W = data.windowDays;
   const periodWord = `${W} days`;
@@ -165,7 +169,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
   const setYieldFor = (key: string, raw: number) => setYields((y) => ({ ...y, [key]: Math.max(0, raw || 0) }));
   const setRoutingFor = (id: string, raw: number) => setRouting((s) => ({ ...s, [id]: Math.max(0, raw || 0) }));
   const clearRouting = () => setRouting({});
-  const resetAssumptions = () => { setLiveWeight(30); setDressingPct(47); setYields({ ...defaultYields }); };
+  const resetAssumptions = () => { setLiveWeight(config.defaultLiveWeight); setDressingPct(config.defaultDressingPct); setYields({ ...defaultYields }); };
   const fatKg = data.cuts.find((c) => c.key === "fat")?.soldKg ?? 0;
   const sharePct = (demand: number) => pct(calc.totalSoldKgDemand > 0 ? (demand / calc.totalSoldKgDemand) * 100 : 0);
   const yieldHalf = Math.ceil(data.cuts.length / 2);
@@ -198,13 +202,13 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: C.orange }}>Buy vs slaughter · {W}-day backtest</div>
           <h1 className="mt-1.5 text-[34px] font-bold leading-tight tracking-tight" style={{ color: C.deep }}>Today vs in-house slaughter</h1>
           <p className="mt-1.5 max-w-3xl text-[15px] leading-relaxed" style={{ color: C.text2 }}>
-            A {W}-day backtest on real order data: would slaughtering whole mutton in-house beat buying cuts from vendors? Adjust the assumptions and the whole comparison recalculates.
+            A {W}-day backtest on real order data: would slaughtering whole {config.unitWord} in-house beat buying cuts from vendors? Adjust the assumptions and the whole comparison recalculates.
           </p>
           <div className="mt-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[12px]" style={{ color: C.text2 }}>
             <Meta>{data.dateMin} – {data.dateMax}</Meta>
-            <Meta>{kg(totalDemandKg)} mutton demand</Meta>
+            <Meta>{kg(totalDemandKg)} {config.unitWord} demand</Meta>
             <Meta>{Math.round(N).toLocaleString("en-PK")} carcass-equivalents</Meta>
-            <Meta>Mutton only · Qurbani excluded</Meta>
+            <Meta>{config.label} only · Qurbani excluded</Meta>
           </div>
         </header>
 
@@ -212,17 +216,20 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center gap-1 rounded-xl border p-1" style={{ borderColor: C.cardBorder, background: "white", boxShadow: SHADOW }}>
             {[
-              { k: "mutton", label: "Mutton", active: true },
-              { k: "cow", label: "Cow", active: false },
-              { k: "chicken", label: "Chicken", active: false },
-            ].map((t) => (
-              <button key={t.k} disabled={!t.active} title={t.active ? undefined : "Coming soon"}
-                className="flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors"
-                style={t.active ? { background: C.deep, color: "white" } : { color: C.faint, cursor: "not-allowed" }}>
-                {t.label}
-                {!t.active && <span className="rounded-full px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide" style={{ background: "#EBE4D8", color: C.text2 }}>Soon</span>}
-              </button>
-            ))}
+              { k: "mutton", label: "Mutton", soon: false },
+              { k: "cow", label: "Cow", soon: false },
+              { k: "chicken", label: "Chicken", soon: true },
+            ].map((t) => {
+              const active = species === t.k;
+              return (
+                <button key={t.k} data-testid={`species-${t.k}`} disabled={t.soon} onClick={() => !t.soon && setSpecies(t.k as Animal)} title={t.soon ? "Coming soon" : undefined}
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors"
+                  style={active ? { background: C.deep, color: "white" } : t.soon ? { color: C.faint, cursor: "not-allowed" } : { color: C.text2, cursor: "pointer" }}>
+                  {t.label}
+                  {t.soon && <span className="rounded-full px-1.5 py-[1px] text-[9px] font-semibold uppercase tracking-wide" style={{ background: "#EBE4D8", color: C.text2 }}>Soon</span>}
+                </button>
+              );
+            })}
           </div>
           <div className="relative" title="Backtest window">
             <select value={String(windowDays)} onChange={(e) => setWindowDays(Number(e.target.value) as 90 | 180)} aria-label="Backtest window"
@@ -301,7 +308,12 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
               </div>
             </div>
             <div className="mt-3 space-y-3">
-              <Slider label="Whole mutton all-in cost (purchase + raising + slaughter + transport)" value={live} min={20000} max={45000} step={100} suffix="" fmt={rs} onChange={setLive} />
+              <Slider label={config.liveSliderLabel} value={live} min={config.livePriceMin} max={config.livePriceMax} step={config.livePriceStep} suffix="" fmt={rs} onChange={setLive} />
+              {config.livePriceEstimate && (
+                <div className="rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: C.amberBg, color: C.amberDark }}>
+                  Estimate only — we don&apos;t buy live or whole {config.unitWord} today, so this all-in cost has no invoice anchor. Treat it as a placeholder and set it to your real figure before relying on the result.
+                </div>
+              )}
             </div>
             <HeroNumber
               dot={<span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.amber }} title="Projected from carcass yields" />}
@@ -373,7 +385,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
             </div>
             <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
               <div className="w-full max-w-sm space-y-1 text-sm">
-                <StackRow label={`Whole mutton (${Math.round(N)} × ${rs(live)})`} value={rs(calc.gross90)} />
+                <StackRow label={`Whole ${config.unitWord} (${Math.round(N)} × ${rs(live)})`} value={rs(calc.gross90)} />
                 <StackRow label="+ Shortfall from vendors" value={rs(calc.shortfall90)} />
                 <StackRow label="− Leftover sold (your input)" value={rs(calc.recovery90)} color={calc.recovery90 > 0 ? C.green : C.text2} />
                 {calc.conversionTotal > 0 && <StackRow label="+ Routing conversion" value={rs(calc.conversionTotal)} color={C.amberDark} />}
@@ -400,7 +412,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
         <div className="rounded-2xl border p-5" style={{ borderColor: C.cardBorder, background: "#FFFCF8", boxShadow: SHADOW }}>
           <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: C.faint }}>Where the money moves</div>
           <p className="mt-1.5 text-[14px] leading-relaxed" style={{ color: C.text2 }}>
-            Of the {rs(calc.today90)} {periodWord} vendor spend, slaughtering {Math.round(N).toLocaleString("en-PK")} mutton in-house replaces it with {rs(calc.gross90)} of whole-mutton purchases.
+            Of the {rs(calc.today90)} {periodWord} vendor spend, slaughtering {Math.round(N).toLocaleString("en-PK")} {config.unitWord} in-house replaces it with {rs(calc.gross90)} of whole-{config.unitWord} purchases.
             You would still spend {rs(calc.shortfall90)} buying shortfall cuts from vendors{topShortfall.length ? ` (mainly ${listNames(topShortfall)})` : ""}.
             By default all {rs(calc.leftoverVal90)} of leftover is treated as waste; mark cuts as sellable in the table above to recover value{calc.recovery90 > 0 ? `, currently ${rs(calc.recovery90)}` : ""}.
             {calc.totalRoutedKg > 0.5 ? ` Re-routing ${kg(calc.totalRoutedKg)} of leftover into shortfall cuts saves a further ${rs(calc.routingSaving)} (net of ${rs(calc.conversionTotal)} conversion).` : ""}
@@ -412,7 +424,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
         <Card>
           <h2 className="text-[17px] font-semibold">How the {W} days actually played out</h2>
           <p className="mt-1 text-[13.5px] leading-relaxed" style={{ color: C.text2 }}>
-            Each square is one day. Color shows whether that day had enough demand to justify slaughtering a whole mutton — at least 75% of carcass weight ({kg(THRESH)}) in customer demand. Hover any square for the day&apos;s numbers.
+            Each square is one day. Color shows whether that day had enough demand to justify slaughtering a whole {config.unitWord}: at least 75% of carcass weight ({kg(THRESH)}) in customer demand. Hover any square for the day&apos;s numbers.
           </p>
           <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: "repeat(30, minmax(0, 1fr))" }}>
             {data.perDay.map((d) => {
@@ -420,7 +432,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
               const decision = d.kg >= THRESH ? "Slaughter justified" : "Low demand — stay piecemeal";
               return (
                 <div key={d.date}
-                  data-tip={`${d.date}\n${d.kg} kg mutton demand\n${muttonNeeded.toFixed(1)} mutton needed (${kg(carcassKg)}/carcass)\n${decision}`}
+                  data-tip={`${d.date}\n${d.kg} kg ${config.unitWord} demand\n${muttonNeeded.toFixed(1)} ${config.unitWord} needed (${kg(carcassKg)}/carcass)\n${decision}`}
                   className="aspect-square cursor-help rounded-[3px] transition-transform hover:scale-110"
                   style={{ background: d.kg >= THRESH ? C.green : C.amber }} />
               );
@@ -448,7 +460,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
             <NumField label="Dressing yield (%)" value={dressingPct} step={1} onChange={setDressingPct} />
             <div className="hidden h-11 w-px self-center sm:block" style={{ background: C.heroBorder }} />
             <Derived label="Dressed carcass" value={kg(carcassKg)} />
-            <Derived label={`Mutton over ${W} days`} value={Math.round(N).toLocaleString("en-PK")} />
+            <Derived label={`${config.label} over ${W} days`} value={Math.round(N).toLocaleString("en-PK")} />
             <button onClick={resetAssumptions} className="ml-auto self-center rounded-lg border bg-white px-3.5 py-2 text-[13px] font-medium transition-colors hover:bg-black/5" style={{ borderColor: "#D9CEBD", color: C.text2 }}>
               Reset to defaults
             </button>
@@ -459,8 +471,8 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
                 <thead>
                   <tr className="text-left" style={{ color: C.text2 }}>
                     <th className="py-1.5 pr-2 font-medium">Cut</th>
-                    <th className="py-1.5 px-2 text-right font-medium"><Th title="Editable — your yield % for this cut; everything above recalculates from it. Pre-filled with standard Pakistani mutton butchery defaults.">Yield %</Th></th>
-                    <th className="py-1.5 pl-2 text-right font-medium"><Th title="Kg of this cut from one dressed carcass: carcass kg × yield %">Kg per mutton</Th></th>
+                    <th className="py-1.5 px-2 text-right font-medium"><Th title={`Editable: your yield % for this cut; everything above recalculates from it. Pre-filled with standard Pakistani ${config.unitWord} butchery defaults.`}>Yield %</Th></th>
+                    <th className="py-1.5 pl-2 text-right font-medium"><Th title="Kg of this cut from one dressed carcass: carcass kg × yield %">Kg per carcass</Th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -488,7 +500,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
             <span>Total yield</span>
             <span className="tabular-nums">
               <span style={{ color: driftWarn ? C.amberDark : C.text }}>{pct(sumYields)}</span>
-              <span style={{ color: C.faint }}> · {kg(carcassKg * (sumYields / 100))} per mutton</span>
+              <span style={{ color: C.faint }}> · {kg(carcassKg * (sumYields / 100))} per carcass</span>
             </span>
           </div>
           {driftWarn && (
@@ -497,7 +509,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
             </p>
           )}
           <p className="mt-4 text-xs leading-relaxed" style={{ color: C.faint }}>
-            Defaults sourced from standard Pakistani mutton butchery yields, ±2-3% variance per cut depending on breed, age, and butchery skill. Validate against your own processing data once you have it.
+            Defaults sourced from standard Pakistani {config.unitWord} butchery yields, ±2-3% variance per cut depending on breed, age, and butchery skill. Validate against your own processing data once you have it.
           </p>
             </div>
           </div>
@@ -566,10 +578,10 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
         <footer className="border-t pt-5 pb-8" style={{ borderColor: C.cardBorder }}>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: C.text2 }}>Methodology &amp; data</div>
           <ul className="mt-3 grid gap-x-10 gap-y-2.5 text-[12.5px] leading-relaxed sm:grid-cols-2" style={{ color: C.text2 }}>
-            <Li><b style={{ color: C.text }}>Window</b> — {data.dateMin} to {data.dateMax}; {data.daysWithOrders} of {data.windowDays} days had mutton orders.</Li>
+            <Li><b style={{ color: C.text }}>Window</b> — {data.dateMin} to {data.dateMax}; {data.daysWithOrders} of {data.windowDays} days had {config.unitWord} orders.</Li>
             <Li><b style={{ color: C.text }}>Qurbani excluded</b> — {kg(data.qurbaniExcludedKg)} across {data.qurbaniExcludedLines} order lines (festival spikes would distort a steady-state model).</Li>
             <Li><b style={{ color: C.text }}>Unmapped / per-piece SKUs</b>, excluded from the kg model — {data.unmapped.length > 0 ? data.unmapped.slice(0, 4).map((u) => `${u.name.slice(0, 28)} (${kg(u.kg)})`).join("; ") : "none"}.</Li>
-            {fatKg > 0 && <Li><b style={{ color: C.text }}>Fat ({kg(fatKg)})</b> is real bulk demand across four &ldquo;Mutton Fat / Charbi&rdquo; SKUs (tallow / rendering buyers) — not a mapping error, so it is kept as-is.</Li>}
+            {fatKg > 0 && <Li><b style={{ color: C.text }}>Fat ({kg(fatKg)})</b> is bulk demand sold to tallow / rendering buyers, not a mapping error, so it is kept as-is.</Li>}
           </ul>
         </footer>
       </div>
@@ -587,7 +599,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(false)}>
           <div className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[16px] font-semibold">Override markup per cut</h3>
-            <p className="mt-1 text-xs leading-relaxed" style={{ color: C.text2 }}>Ranked by sales over the {W}-day window. Leave blank to use the global markup of {markup}%. Greyed cuts had no meaningful direct sales (volume only from whole-bakra orders).</p>
+            <p className="mt-1 text-xs leading-relaxed" style={{ color: C.text2 }}>Ranked by sales over the {W}-day window. Leave blank to use the global markup of {markup}%. Greyed cuts had no meaningful direct sales (volume only from whole-carcass orders).</p>
             <div className="mt-3 space-y-0.5">
               {cutsBySales.map((c, idx) => {
                 const share = totalSold > 0 ? (c.soldKg / totalSold) * 100 : 0;
