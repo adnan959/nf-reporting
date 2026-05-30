@@ -4,12 +4,12 @@ Last updated: 2026-05-30
 
 ## Deployed
 
-- Vercel URL: production deploy live via the GitHub integration (project adnan959s-projects/nf-reporting). Exact alias confirmed after the revert build completes.
-- Current state: Procurement tab on its original **retail × markup** baseline. The real-invoice baseline experiment (2026-05-30) was reverted at the founder's call.
+- Vercel URL: https://nf-reporting.vercel.app (production, tracks `main`, via the GitHub integration).
+- Current state: Procurement tool with **Mutton + Cow** species tabs both live (Chicken "SOON"). Retail × markup baseline (the real-invoice experiment was reverted on 2026-05-30). Cow's in-house whole-cow cost is a flagged unverified estimate.
 
 ## Mid-flight
 
-- Cow tab built on branch `feat/cow-tab` (not yet merged/deployed). Mutton + Cow species both active; Chicken still "SOON". Awaiting founder review before merge.
+- Nothing in progress. Chicken tab not built.
 
 ## Known issues
 
