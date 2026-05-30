@@ -25,9 +25,9 @@ const sum = <T,>(a: T[], f: (t: T) => number) => a.reduce((s, x) => s + f(x), 0)
 type AnimalPair = { d90: AnimalData; d180: AnimalData };
 
 // Top-level tool: owns the species switch and renders the per-animal comparison.
-export function ProcurementTool({ mutton, cow }: { mutton: AnimalPair; cow: AnimalPair }) {
+export function ProcurementTool({ mutton, cow, chicken }: { mutton: AnimalPair; cow: AnimalPair; chicken: AnimalPair }) {
   const [species, setSpecies] = useState<Animal>("mutton");
-  const pair = species === "mutton" ? mutton : cow;
+  const pair = species === "cow" ? cow : species === "chicken" ? chicken : mutton;
   // key={species} remounts the view on switch, resetting every per-animal input
   // (markup, live cost, yields, routing) to that animal's defaults.
   return <AnimalView key={species} species={species} setSpecies={setSpecies} config={ANIMAL_CONFIG[species]} d90={pair.d90} d180={pair.d180} />;
@@ -218,7 +218,7 @@ function AnimalView({ species, setSpecies, config, d90, d180 }: { species: Anima
             {[
               { k: "mutton", label: "Mutton", soon: false },
               { k: "cow", label: "Cow", soon: false },
-              { k: "chicken", label: "Chicken", soon: true },
+              { k: "chicken", label: "Chicken", soon: false },
             ].map((t) => {
               const active = species === t.k;
               return (
@@ -309,11 +309,6 @@ function AnimalView({ species, setSpecies, config, d90, d180 }: { species: Anima
             </div>
             <div className="mt-3 space-y-3">
               <Slider label={config.liveSliderLabel} value={live} min={config.livePriceMin} max={config.livePriceMax} step={config.livePriceStep} suffix="" fmt={rs} onChange={setLive} />
-              {config.livePriceEstimate && (
-                <div className="rounded-lg px-3 py-2 text-[11px] leading-relaxed" style={{ background: C.amberBg, color: C.amberDark }}>
-                  Estimate only — we don&apos;t buy live or whole {config.unitWord} today, so this all-in cost has no invoice anchor. Treat it as a placeholder and set it to your real figure before relying on the result.
-                </div>
-              )}
             </div>
             <HeroNumber
               dot={<span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.amber }} title="Projected from carcass yields" />}
@@ -582,6 +577,7 @@ function AnimalView({ species, setSpecies, config, d90, d180 }: { species: Anima
             <Li><b style={{ color: C.text }}>Qurbani excluded</b> — {kg(data.qurbaniExcludedKg)} across {data.qurbaniExcludedLines} order lines (festival spikes would distort a steady-state model).</Li>
             <Li><b style={{ color: C.text }}>Unmapped / per-piece SKUs</b>, excluded from the kg model — {data.unmapped.length > 0 ? data.unmapped.slice(0, 4).map((u) => `${u.name.slice(0, 28)} (${kg(u.kg)})`).join("; ") : "none"}.</Li>
             {fatKg > 0 && <Li><b style={{ color: C.text }}>Fat ({kg(fatKg)})</b> is bulk demand sold to tallow / rendering buyers, not a mapping error, so it is kept as-is.</Li>}
+            {config.livePriceEstimate && <Li><b style={{ color: C.text }}>In-house cost</b> — we don&apos;t buy live or whole {config.unitWord}, so the whole-{config.unitWord} cost is an unverified estimate. Set it to a real figure before relying on the result.</Li>}
           </ul>
         </footer>
       </div>

@@ -1,6 +1,6 @@
 // Core domain types for the procurement backtest.
 
-export type Animal = "mutton" | "cow";
+export type Animal = "mutton" | "cow" | "chicken";
 
 // One canonical carcass cut, with its default yield % of dressed carcass.
 export interface CutDef {

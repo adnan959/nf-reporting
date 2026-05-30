@@ -18,4 +18,13 @@ export const RETAIL_RATES: VendorRates = {
     puth_shoulder: 1800, kaleji_liver: 1275, gurda_kidney: 300, maghaz_brain: 400,
     bones: 777, fat: 200, paya: 400, siri_head: 400, dil_heart: 400, zaban_tongue: 400, trim: 200,
   },
+  // Chicken rates are realized selling prices (line_subtotal / qty) from the last
+  // 180 days of real orders, not a storefront snapshot — so they are grounded in
+  // what customers actually paid. Bone-in cuts (karahi/qorma/biryani/whole) sit
+  // ~Rs 950-1020; boneless/breast/mince ~Rs 1280-1320; wings ~Rs 680.
+  chicken: {
+    karahi_cut: 950, breast: 1300, boneless: 1300, thigh: 1200, drumstick: 1020,
+    mince: 1280, qorma_cut: 960, whole_roast: 1020, biryani_cut: 1020, wing: 681,
+    bones: 200, offal: 300,
+  },
 };

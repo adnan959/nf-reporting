@@ -12,7 +12,7 @@ Built 2026-05-30. The "Cow" species tab is now active alongside Mutton (Chicken 
 
 ## Big caveat (read first)
 
-**We do not buy live or whole cow today.** Every cow vendor purchase in `t_fin_vendor_purchase_items` is a specific cut (Veal Raan ~Rs 1,350/kg, Boneless ~Rs 1,550/kg, Mix ~Rs 1,300/kg, Undercut ~Rs 2,450/kg). There are zero live-cow or whole-carcass purchases. So the in-house side has **no real cost anchor** — the whole-cow all-in cost (default Rs 200,000) is a pure estimate. The tool flags this prominently with an amber notice beside the cost slider. The founder must supply a real figure before the cow in-house result can be trusted. This is a weaker backtest than mutton, where live-goat purchases (~Rs 1,300/kg) at least anchor the animal cost.
+**We do not buy live or whole cow today.** Every cow vendor purchase in `t_fin_vendor_purchase_items` is a specific cut (Veal Raan ~Rs 1,350/kg, Boneless ~Rs 1,550/kg, Mix ~Rs 1,300/kg, Undercut ~Rs 2,450/kg). There are zero live-cow or whole-carcass purchases. So the in-house side has **no real cost anchor**: the whole-cow all-in cost (default Rs 200,000) is a pure estimate. This is noted in the methodology footer (a prominent amber notice was removed on 2026-05-30 at the founder's request). The founder must supply a real figure before the cow in-house result can be trusted. This is a weaker backtest than mutton, where live-goat purchases (~Rs 1,300/kg) at least anchor the animal cost.
 
 Decision (2026-05-30): per the founder, mirror the mutton tool exactly and flag the estimate, rather than reframe cow around its (real) per-cut vendor rates. Rationale: consistency with the mutton tab; the per-cut-rate reframing is closer to the real-invoice view that was reverted for mutton on the same day.
 

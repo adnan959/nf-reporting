@@ -11,7 +11,7 @@ import type { Animal } from "./types";
 // Dressed-carcass weight used only for display fields (carcassEquivalents and the
 // per-cut kgPerCarcass shown in the yields modal). The live comparison recomputes
 // carcass kg from the editable live-weight × dressing sliders, so this is cosmetic.
-export const DRESSED_CARCASS_KG: Record<Animal, number> = { mutton: 14, cow: 125 };
+export const DRESSED_CARCASS_KG: Record<Animal, number> = { mutton: 14, cow: 125, chicken: 1.2 };
 
 // Order line-item name patterns per animal (Bakra = whole/half mutton; veal = young
 // cow, the dominant cow product here). Qurbani/charity lines are excluded downstream
@@ -19,6 +19,7 @@ export const DRESSED_CARCASS_KG: Record<Animal, number> = { mutton: 14, cow: 125
 const NAME_LIKE: Record<Animal, string[]> = {
   mutton: ["%Mutton%", "%Bakra%"],
   cow: ["%beef%", "%veal%", "%cow%"],
+  chicken: ["%chicken%", "%murgh%"],
 };
 
 export interface AnimalCut {

@@ -63,4 +63,24 @@ export const ANIMAL_CONFIG: Record<Animal, AnimalConfig> = {
       { id: "fat_keema", src: "fat", dst: "keema", desc: "Add fat content to mince blend" },
     ],
   },
+  chicken: {
+    animal: "chicken",
+    label: "Chicken",
+    unitWord: "chicken",
+    defaultLiveWeight: 1.8,
+    defaultDressingPct: 70,
+    defaultLivePrice: 750,
+    livePriceMin: 400,
+    livePriceMax: 1200,
+    livePriceStep: 10,
+    liveSliderLabel: "Whole chicken all-in cost (purchase + slaughter + transport)",
+    livePriceEstimate: true, // we do not buy chicken from vendors at all — pure estimate
+    routes: [
+      { id: "thigh_boneless", src: "thigh", dst: "boneless", desc: "Debone thigh into boneless" },
+      { id: "drum_karahi", src: "drumstick", dst: "karahi_cut", desc: "Chop drumsticks into karahi cut" },
+      { id: "wing_karahi", src: "wing", dst: "karahi_cut", desc: "Add wings to karahi mix" },
+      { id: "whole_boneless", src: "whole_roast", dst: "boneless", desc: "Debone whole birds into boneless" },
+      { id: "qorma_karahi", src: "qorma_cut", dst: "karahi_cut", desc: "Re-cut qorma into karahi" },
+    ],
+  },
 };

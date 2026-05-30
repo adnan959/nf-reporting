@@ -47,8 +47,30 @@ export const CUTS_COW: CutDef[] = [
   { key: "trim", label: "Trim / waste", yieldPct: 0.9 },
 ];
 
+// Chicken is sold mostly as processing/sale forms (karahi cut, boneless cubes,
+// mince, breast) rather than strict anatomy, so — like CUTS_COW's boti/keema/
+// karahi — these "cuts" are an allocation of a dressed bird's sellable kg across
+// the forms customers actually buy. Yields sum to 100. Defaults are broiler-mix
+// approximations; validate against real processing once available.
+export const CUTS_CHICKEN: CutDef[] = [
+  { key: "karahi_cut", label: "Karahi cut (bone-in)", yieldPct: 22 },
+  { key: "breast", label: "Breast (boneless)", yieldPct: 16 },
+  { key: "boneless", label: "Boneless cubes", yieldPct: 14 },
+  { key: "thigh", label: "Thigh", yieldPct: 9 },
+  { key: "drumstick", label: "Drumstick / Leg", yieldPct: 8 },
+  { key: "mince", label: "Keema / Mince", yieldPct: 8 },
+  { key: "qorma_cut", label: "Qorma cut (bone-in)", yieldPct: 7 },
+  { key: "whole_roast", label: "Whole (roast)", yieldPct: 5 },
+  { key: "biryani_cut", label: "Biryani cut (bone-in)", yieldPct: 4 },
+  { key: "wing", label: "Wings", yieldPct: 3 },
+  { key: "bones", label: "Bones", yieldPct: 3 },
+  { key: "offal", label: "Offal (liver / gizzard)", yieldPct: 1 },
+];
+
 export function cutsFor(animal: Animal): CutDef[] {
-  return animal === "mutton" ? CUTS_MUTTON : CUTS_COW;
+  if (animal === "mutton") return CUTS_MUTTON;
+  if (animal === "cow") return CUTS_COW;
+  return CUTS_CHICKEN;
 }
 
 export function defaultCutYields(animal: Animal): Record<string, number> {

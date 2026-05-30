@@ -37,6 +37,24 @@ const KEYWORDS: [RegExp, string | null, string | null][] = [
   [/\bpaya\b|trotter/, "paya", "paya"],
 ];
 
+// Chicken sale forms, matched on descriptive SKU names (first match wins).
+// Order matters: breast (fillet/julienne/butterfly) and thigh are checked before
+// the generic "boneless", so "Thigh Boneless" → thigh and "Boneless Fillet" → breast.
+const CHICKEN_KEYWORDS: [RegExp, string][] = [
+  [/karahi/, "karahi_cut"],
+  [/qorma|korma/, "qorma_cut"],
+  [/biryani/, "biryani_cut"],
+  [/mince|qeema|keema/, "mince"],
+  [/breast|fillet|julienne|butterfly/, "breast"],
+  [/thigh/, "thigh"],
+  [/drumstick|tikka leg|\bleg\b/, "drumstick"],
+  [/wing/, "wing"],
+  [/boneless|cubes|\bboti\b/, "boneless"],
+  [/whole|roast|baby chicken/, "whole_roast"],
+  [/\bbones?\b/, "bones"],
+  [/liver|gizzard|offal/, "offal"],
+];
+
 function extractCode(name: string): string | null {
   // matches "(LR)", "(HB 3.5)", "(MQ)" etc.
   const m = name.match(/\(([A-Z]{2,3})(?:\s*[\d.]+)?\)/);
@@ -56,17 +74,33 @@ export function mapSku(rawName: string): SkuMapping {
     return { ...base, animal: "qurbani", flagged: false, reason: "Qurbani/charity line, excluded by spec" };
   if (/dog food|^df\b|\bdf -|\(df/.test(s))
     return { ...base, animal: "other", flagged: false, reason: "Dog food, excluded" };
-  if (/chicken/.test(s))
-    return { ...base, animal: "chicken", flagged: false, reason: "Chicken, out of scope" };
   if (/\blamb\b/.test(s))
     return { ...base, animal: "lamb", flagged: true, reason: "Lamb (sheep), not mutton/cow, review" };
 
   // 2. Animal.
-  const animal: Animal | null = /mutton|bakra/.test(s) ? "mutton" : /beef|veal/.test(s) ? "cow" : null;
+  const animal: Animal | null = /mutton|bakra/.test(s) ? "mutton" : /beef|veal/.test(s) ? "cow" : /chicken|murgh/.test(s) ? "chicken" : null;
   if (!animal) return { ...base, reason: "Animal type not recognised" };
 
-  const unit: "kg" | "piece" = /per piece|per pcs|\(\d+\s*pcs?\)|\bpcs\b/.test(s) ? "piece" : "kg";
-  const processed = /shami|samosa|kabab|patties|nugget|sausage|hunter beef|seekh/.test(s);
+  // "per kg" wins over a piece-count descriptor: chicken cuts like "Karahi Cut
+  // (22 Pcs) per kg" are sold by weight; the "(22 Pcs)" just describes the chop.
+  const unit: "kg" | "piece" = /per kg|per kilo/.test(s)
+    ? "kg"
+    : /per piece|per pcs|\(\d+\s*pcs?\)|\bpcs\b/.test(s) ? "piece" : "kg";
+  const processed = /shami|samosa|kabab|patties|nugget|sausage|hunter beef|seekh|spring roll/.test(s);
+
+  // 2b. Chicken: own path. Chicken SKUs use letter+digit codes (C0, B2, ...) that
+  // extractCode doesn't capture, but the names are descriptive, so match on those.
+  // Bone-in forms (karahi/qorma/biryani/whole) and boneless/breast/mince are the
+  // sale forms in CUTS_CHICKEN. Dog-food chicken necks are already excluded above.
+  if (animal === "chicken") {
+    for (const [re, cut] of CHICKEN_KEYWORDS) {
+      if (re.test(s))
+        return { ...base, animal, unit, processed, cutKey: cut, confidence: "keyword",
+          flagged: processed || unit !== "kg",
+          reason: `Chicken keyword (${re.source.split("|")[0]})` + (processed ? " + processed" : "") + (unit !== "kg" ? " + per piece" : "") };
+    }
+    return { ...base, animal, unit, processed, reason: "Chicken line, no cut keyword match" };
+  }
 
   // 3. Whole/half animal -> demands all cuts proportionally.
   if (/whole bakra|half bakra/.test(s) || extractCode(name) === "HB" || extractCode(name) === "WB")
@@ -113,7 +147,7 @@ export function mapSku(rawName: string): SkuMapping {
 // Returns [] for non-mutton/cow or non-kg lines. "__whole" is returned as-is
 // (callers explode it via carcass yields).
 export function allocate(m: SkuMapping, kg: number): { cutKey: string; kg: number }[] {
-  if (m.unit !== "kg" || (m.animal !== "mutton" && m.animal !== "cow")) return [];
+  if (m.unit !== "kg" || (m.animal !== "mutton" && m.animal !== "cow" && m.animal !== "chicken")) return [];
   if (m.splits?.length) return m.splits.map((s) => ({ cutKey: s.cutKey, kg: kg * s.frac }));
   if (m.cutKey) return [{ cutKey: m.cutKey, kg }];
   return [];

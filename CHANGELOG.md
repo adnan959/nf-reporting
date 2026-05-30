@@ -2,6 +2,16 @@
 
 All notable changes to the Nizami Farms internal dashboard. Format: date · tab · what changed · why.
 
+## 2026-05-30 · chicken · Chicken species tab + remove cow estimate box
+
+Activated the Chicken tab (Mutton, Cow, Chicken all live now). Added "chicken" to the `Animal` type and the supporting tables: `CUTS_CHICKEN` (sale-form allocation — karahi cut, breast, boneless, thigh, drumstick, mince, qorma/biryani, whole, wings, bones, offal — summing to 100%), `RETAIL_RATES.chicken` (realized selling prices from real orders, not invented), a dedicated chicken keyword path in skuMap (its `(C0)/(B2)` codes are letter+digit, so name-based), plus chicken entries in ANIMAL_CONFIG / DRESSED_CARCASS_KG / NAME_LIKE and page.tsx. Result: 9,947 kg mapped over 180 days (172 order-days, 88% coverage; processed and "organic desi" lines excluded).
+
+Two bug fixes surfaced by chicken, both also correct for the other species: (1) the unit detector now treats "(22 Pcs) per kg" as sold-by-weight ("per kg" wins over the piece-count descriptor) instead of per-piece; (2) `allocate()` no longer drops any animal that isn't mutton/cow (it silently returned [] for chicken). Mutton and cow demand are byte-identical after these fixes (verified), so no regression.
+
+Caveats (chicken is the most speculative tab): we buy zero chicken from vendors, so the in-house whole-bird cost (Rs 750 default) is a pure estimate; the slaughter-in-house framing fits chicken least; cuts are sale-form allocations with broiler-mix yields. All noted in the methodology footer and docs/spec/chicken.md. The baseline, however, is grounded in real realized prices.
+
+Also removed the prominent amber "estimate" box on the cow in-house cost (founder request); the estimate caveat now lives as a quiet line in the methodology footer for both cow and chicken.
+
 ## 2026-05-30 · cow · Cow species tab (mirrors mutton)
 
 Activated the Cow tab. Generalised the engine so mutton and cow share one code path: new `lib/animalData.ts` (`buildAnimalData(animal, days)`, replacing the mutton-only `lib/mutton.ts`), new `lib/animalConfig.ts` (`ANIMAL_CONFIG` — per-animal defaults, slider bounds, routing, copy, and a live-price-is-an-estimate flag), and `components/MuttonTool.tsx` → `components/ProcurementTool.tsx` split into a `ProcurementTool` parent (owns the species switch) and a parameterised `AnimalView` (remounted per species so inputs reset to that animal's defaults). `app/page.tsx` now builds both animals.
