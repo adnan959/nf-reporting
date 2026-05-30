@@ -4,33 +4,27 @@ Last updated: 2026-05-30
 
 ## Deployed
 
-- Vercel URL: [to be added when first deployed]
-- Current state: Procurement tab — real-invoice baseline now wired in and default. Routing modal, numbers audit, foundational specs complete.
+- Vercel URL: production deploy live via the GitHub integration (project adnan959s-projects/nf-reporting). Exact alias confirmed after the revert build completes.
+- Current state: Procurement tab on its original **retail × markup** baseline. The real-invoice baseline experiment (2026-05-30) was reverted at the founder's call.
 
 ## Mid-flight
 
-- On branch `feat/real-invoice-baseline` (not yet merged to main). Real vendor rates from MySQL are live; awaiting founder review before merge/deploy.
-
-## Headline finding (2026-05-30)
-
-- With the **real vendor invoice baseline** (default), slaughtering in-house is NOT cheaper at the current Rs 35k all-in cost. The headline flips from the old retail-derived +17% saving to a **−19% loss (180d) / −14% (90d)** — in-house is ~Rs 3.0M MORE expensive over 180 days. The earlier saving was an artifact of valuing the baseline at Shopify retail × markup. Toggle to "Retail × markup" to see the old view.
+- Cow tab — starting build-out. Currently a "SOON" placeholder in the species selector. Procurement (mutton) is the shipped reference implementation to mirror.
 
 ## Known issues
 
-- Live all-in cost default (Rs 35k) is optimistic vs real data (whole dressed carcass ~Rs 2,654/kg ≈ Rs 37.4k; live goat ~Rs 1,298/kg, both pre-slaughter/transport). Anchors are shown beside the slider; default left at Rs 35k pending the founder's true figure. A realistic ~Rs 38-40k widens the loss.
-- Bones row saving math may overstate loss. Root cause is the uniform per-kg carcass-cost allocation (every kg charged live/carcass), not retail valuation — it inflates the loss on cheap/waste cuts and the gain on premium cuts in the per-cut Saving column. Headline total is unaffected. Worth a value-based allocation in a future iteration.
-- Surplus leftover and "Can sell" recovery are still valued at full retail even in real mode; a wholesale/byproduct rate would be more honest. Does not affect the default headline (recovery default 0).
+- "Today" vendor side prices cuts at Shopify retail × markup. Real vendor invoice rates (which live in the MySQL finance tables, ~Rs 2,460/kg blended for mutton) sit lower. This inflates the savings number. We built and then reverted a real-invoice baseline on 2026-05-30; the finding (in-house is not cheaper at real rates and the current cost assumption) is recorded in CHANGELOG but is intentionally not wired into the tool. The current model is honest about its framing in the methodology footer.
+- Bones row saving math may overstate loss. Bones are not really sold at retail today; the model values bones leftover at full retail, which probably exaggerates the in-house cost. Worth reviewing during the next iteration.
 
 ## Next planned
 
-- Founder to confirm the true all-in cost per mutton (purchase + raising + slaughter + transport) so the live slider default can be set honestly; current real anchors imply ~Rs 38-40k.
-- Decide framing for Taimur now that the honest answer is "buying cuts is cheaper than slaughtering at current costs." The tool's value shifts from "here's the saving" to "here's why vertical integration doesn't pay yet, and what would have to change (cheaper live sourcing, byproduct resale channel, premium-cut demand) for it to."
-- Merge `feat/real-invoice-baseline` to main and deploy to Vercel.
-- Tab 2 candidates: Profit & Closing, Inventory. To be scoped after Taimur conversation.
+- Build the Cow tab: mirror the procurement comparison for cow/veal using CUTS_COW, cow retail rates, and cow demand from MySQL. Activate the "Cow" species button (currently disabled "SOON").
+- Verify markup assumption against 3 real butcher invoices (one afternoon task for the founder).
+- Tab 2 candidates beyond Cow: Profit & Closing, Inventory. To be scoped after the Taimur conversation.
 
 ## Recent changes
 
-- 2026-05-30 · procurement · Real vendor invoice baseline wired from t_fin_vendor_purchase_items, made default; retail × markup demoted to a toggle. Headline flips to a loss.
+- 2026-05-30 · procurement · Reverted the real-invoice baseline experiment; procurement returns to the retail × markup baseline. First production deploy to Vercel via GitHub integration.
 - 2026-05-25 · procurement · Routing modal + audit + foundational specs.
 - 2026-05-24 · procurement · Saving column, routing UI scaffolding, opportunity icons, yield assumptions modal.
 - 2026-05-23 · procurement · Single-page rebuild with honest math (shortfall, leftover, zero-recovery default).

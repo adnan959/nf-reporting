@@ -2,7 +2,6 @@ import { query } from "./db";
 import { mapSku, allocate } from "./skuMap";
 import { CUTS_MUTTON } from "./cuts";
 import { RETAIL_RATES } from "./retail";
-import { buildVendorRates, vendorRateForCut, type VendorRateInfo } from "./vendorRates";
 
 export const DRESSED_CARCASS_KG = 14; // dressed mutton carcass
 
@@ -12,8 +11,7 @@ export interface MuttonCut {
   yieldPct: number;
   kgPerMutton: number; // 14 * yield%
   soldKg: number; // real demand over the window
-  retail: number; // PKR/kg — Shopify storefront selling price (what we SELL at)
-  vendorRate: number; // PKR/kg — real vendor invoice rate (what we PAY today), from t_fin_vendor_purchase_items
+  retail: number; // PKR/kg
 }
 
 export interface MuttonData {
@@ -28,7 +26,6 @@ export interface MuttonData {
   qurbaniExcludedKg: number;
   qurbaniExcludedLines: number;
   unmapped: { name: string; kg: number; reason: string }[];
-  vendorRates: VendorRateInfo; // real invoice rates over the same window (honest "today" baseline)
 }
 
 function addDays(iso: string, n: number): string {
@@ -84,15 +81,11 @@ export async function buildMuttonData(days = 90): Promise<MuttonData> {
     }
   }
 
-  // Real vendor invoice rates over the same window (honest baseline; see lib/vendorRates.ts).
-  const vendorRates = await buildVendorRates(dateMin, dateMax);
-
   const cuts: MuttonCut[] = CUTS_MUTTON.map((c) => ({
     key: c.key, label: c.label, yieldPct: c.yieldPct,
     kgPerMutton: DRESSED_CARCASS_KG * (c.yieldPct / 100),
     soldKg: Math.round((soldByCut[c.key] ?? 0) * 10) / 10,
     retail: RETAIL_RATES.mutton[c.key] ?? 0,
-    vendorRate: vendorRateForCut(c.key, vendorRates),
   }));
 
   const totalSoldKg = cuts.reduce((s, c) => s + c.soldKg, 0);
@@ -113,6 +106,5 @@ export async function buildMuttonData(days = 90): Promise<MuttonData> {
     unmapped: Array.from(unmappedAgg.entries())
       .map(([name, v]) => ({ name, kg: Math.round(v.kg * 10) / 10, reason: v.reason }))
       .sort((a, b) => b.kg - a.kg),
-    vendorRates,
   };
 }

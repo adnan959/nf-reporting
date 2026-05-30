@@ -32,9 +32,6 @@ const ROUTES: { id: string; src: string; dst: string; desc: string }[] = [
 export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData }) {
   const [windowDays, setWindowDays] = useState<90 | 180>(180);
   const data = windowDays === 90 ? d90 : d180;
-  // Baseline mode: "real" values vendor purchases at actual invoice rates (the honest
-  // default); "retail" values them at Shopify retail × markup (the old, inflated view).
-  const [baselineMode, setBaselineMode] = useState<"real" | "retail">("real");
   const [markup, setMarkup] = useState(10);
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [modal, setModal] = useState(false);
@@ -77,9 +74,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
     // 1) Base per-cut metrics (pre-routing).
     const base = data.cuts.map((c) => {
       const eff = overrides[c.key] ?? markup;
-      // Vendor transaction price — drives both the baseline spend and the shortfall buy.
-      // "real": actual invoice rate from MySQL (no markup). "retail": Shopify retail × markup.
-      const butcherPrice = baselineMode === "real" ? c.vendorRate : c.retail * (1 + eff / 100);
+      const butcherPrice = c.retail * (1 + eff / 100); // vendor price = retail × (1 + markup)
       const cutYield = yields[c.key] ?? c.yieldPct;
       const kgPerMutton = carcassKg * (cutYield / 100);
       const demand = c.soldKg; // real customer demand
@@ -149,22 +144,12 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
       totalCarcassSold90: sum(rows, (r) => r.carcassSold),
       totalLeftover90: sum(rows, (r) => r.leftover),
     };
-  }, [data, baselineMode, markup, overrides, live, canSell, N, carcassKg, yields, routing, conversionCost]);
+  }, [data, markup, overrides, live, canSell, N, carcassKg, yields, routing, conversionCost]);
 
   const W = data.windowDays;
   const periodWord = `${W} days`;
   const cheaper = calc.diff90 > 0;
   const savingPct = calc.today90 > 0 ? (calc.diff90 / calc.today90) * 100 : 0; // + = in-house cheaper
-  const vr = data.vendorRates;
-  const costTipLeft = baselineMode === "real"
-    ? `What you pay vendors: kg × real invoice rate (Rs ${vr.blendedRate.toLocaleString("en-PK")}/kg blended, Fat Rs ${vr.fatRate.toLocaleString("en-PK")}/kg)`
-    : "What you pay vendors: kg × retail price × (1 + markup)";
-  const baselineFootnote = baselineMode === "real"
-    ? `real invoice rate Rs ${vr.blendedRate.toLocaleString("en-PK")}/kg blended (Fat Rs ${vr.fatRate.toLocaleString("en-PK")}/kg) from ${vr.sampleLines} purchase lines in ${vr.source}${vr.windowMatched ? "" : "; all-time fallback (thin in-window sample)"}. Vendors invoice generic mutton at one rate, so cuts share it.`
-    : `Shopify retail price × ${markup}% markup. This is the SELL price, not what we pay vendors, so it inflates the baseline and the headline saving. Switch to "Real invoice" for the honest number.`;
-  // Real-invoice anchors for the in-house carcass cost (so the live slider can be set honestly).
-  const wholeCarcassCost = vr.wholeRate * carcassKg; // buying a whole dressed carcass at the real rate
-  const liveAnimalCost = vr.liveRate * liveWeight; // buying the live animal at the real rate (before slaughter/transport)
 
   const THRESH = 0.75 * carcassKg; // a day "justifies" slaughter if demand >= 75% of one carcass
   const greenDays = data.perDay.filter((d) => d.kg >= THRESH).length;
@@ -258,48 +243,26 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
                 <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: C.faint }}>Baseline · what you do now</div>
                 <h2 className="mt-1 text-[17px] font-semibold" style={{ color: C.text }}>Buying from vendors</h2>
               </div>
-              {baselineMode === "retail" && (
-                <button onClick={() => setModal(true)} title="Override markup per cut" aria-label="Override markup per cut" className="-mr-1 flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-black/5" style={{ borderColor: "#D9CEBD", color: C.text2 }}>
-                  <Settings size={15} /> Markups
-                </button>
-              )}
+              <button onClick={() => setModal(true)} title="Override markup per cut" aria-label="Override markup per cut" className="-mr-1 flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-black/5" style={{ borderColor: "#D9CEBD", color: C.text2 }}>
+                <Settings size={15} /> Markups
+              </button>
             </div>
             <div className="mt-3 space-y-3">
-              <Segmented
-                value={baselineMode}
-                onChange={(v) => setBaselineMode(v as "real" | "retail")}
-                options={[
-                  { k: "real", label: "Real invoice", tip: `What we actually paid vendors: Rs ${data.vendorRates.blendedRate.toLocaleString("en-PK")}/kg blended from ${data.vendorRates.sampleLines} invoice lines (${data.vendorRates.source}). The honest baseline.` },
-                  { k: "retail", label: "Retail × markup", tip: "Shopify retail price × markup slider. This is what we SELL at, not what we pay vendors — it inflates the baseline and the saving. Kept for comparison only." },
-                ]}
-              />
-              {baselineMode === "real" ? (
-                <div className="rounded-lg border px-3 py-2 text-[11.5px] leading-relaxed" style={{ borderColor: C.heroBorder, background: C.heroBg, color: C.text2 }}>
-                  <span style={{ color: C.text }}>Rs {data.vendorRates.blendedRate.toLocaleString("en-PK")}/kg</span> blended mutton, from{" "}
-                  <span style={{ color: C.text }}>{data.vendorRates.sampleLines}</span> real invoice lines
-                  {data.vendorRates.sampleKg > 0 ? ` (${kg(data.vendorRates.sampleKg)})` : ""}
-                  {data.vendorRates.windowMatched && data.vendorRates.rateDateMin ? ` over ${data.vendorRates.rateDateMin}–${data.vendorRates.rateDateMax}` : " (all-time; thin in-window sample)"}.
-                  Fat at Rs {data.vendorRates.fatRate.toLocaleString("en-PK")}/kg. Vendors invoice generic mutton at one rate, so cuts share it.
+              <Slider label="Vendor markup over wholesale" value={markup} min={5} max={20} step={1} suffix="%" onChange={setMarkup} />
+              {ovCount > 0 && (
+                <div className="text-[11px]" style={{ color: C.text2 }}>
+                  Overrides: {Object.entries(overrides).map(([k, v]) => `${data.cuts.find((c) => c.key === k)?.label ?? k} ${v}%`).join(", ")}
                 </div>
-              ) : (
-                <>
-                  <Slider label="Vendor markup over wholesale" value={markup} min={5} max={20} step={1} suffix="%" onChange={setMarkup} />
-                  {ovCount > 0 && (
-                    <div className="text-[11px]" style={{ color: C.text2 }}>
-                      Overrides: {Object.entries(overrides).map(([k, v]) => `${data.cuts.find((c) => c.key === k)?.label ?? k} ${v}%`).join(", ")}
-                    </div>
-                  )}
-                </>
               )}
             </div>
-            <HeroNumber dot={<LiveDot />} value={rs(calc.today90)} label={`${W}-day vendor spend · ${baselineMode === "real" ? "real invoice" : "retail × markup"}`} sub={`${kg(calc.totalSoldKgDemand)} of cuts sold`} />
+            <HeroNumber dot={<LiveDot />} value={rs(calc.today90)} label={`${W}-day vendor spend`} sub={`${kg(calc.totalSoldKgDemand)} of cuts sold`} />
             <table className="mt-5 w-full text-sm">
               <thead>
                 <tr className="text-left align-bottom" style={{ height: HEAD_H, color: C.text2 }}>
                   <th className="pb-2 pr-2 font-medium">Cut</th>
                   <th className="pb-2 px-2 text-right font-medium"><Th title="Share of total kg sold (this cut vs all cuts)">Share</Th></th>
                   <th className="pb-2 px-2 text-right font-medium"><Th title="Customer demand for this cut, from real orders">Demand</Th></th>
-                  <th className="pb-2 pl-2 text-right font-medium"><Th title={costTipLeft}>Cost</Th></th>
+                  <th className="pb-2 pl-2 text-right font-medium"><Th title="What you pay vendors: kg × retail price × (1 + markup)">Cost</Th></th>
                 </tr>
               </thead>
               <tbody>
@@ -339,16 +302,6 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
             </div>
             <div className="mt-3 space-y-3">
               <Slider label="Whole mutton all-in cost (purchase + raising + slaughter + transport)" value={live} min={20000} max={45000} step={100} suffix="" fmt={rs} onChange={setLive} />
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: C.faint }}>
-                <span data-tip={`Real invoices for whole dressed mutton: Rs ${vr.wholeRate.toLocaleString("en-PK")}/kg × ${kg(carcassKg)} carcass. Your all-in should sit at or above this once slaughter and transport are added.`} className="cursor-help">
-                  Real anchor: whole carcass <b style={{ color: C.text2 }}>{rs(wholeCarcassCost)}</b>
-                </span>
-                <span style={{ color: C.heroBorder }}>·</span>
-                <span data-tip={`Real invoices for live-weight goat: Rs ${vr.liveRate.toLocaleString("en-PK")}/kg × ${liveWeight} kg live, before dressing loss, slaughter and transport.`} className="cursor-help">
-                  live animal <b style={{ color: C.text2 }}>{rs(liveAnimalCost)}</b>
-                </span>
-                {live < wholeCarcassCost && <span style={{ color: C.amberDark }}>· below the real carcass cost — likely optimistic</span>}
-              </div>
             </div>
             <HeroNumber
               dot={<span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: C.amber }} title="Projected from carcass yields" />}
@@ -379,7 +332,7 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
               <tbody>
                 {orderedRows.map((r) => (
                   <tr key={r.key} className="border-t align-middle transition-colors hover:bg-[#FAF6F0]" style={{ height: ROW_H, borderColor: C.rowBorder }}>
-                    <td className="pr-2"><span className="inline-flex items-center gap-1.5">{r.label}<OppIcon r={r} mode={baselineMode} /></span></td>
+                    <td className="pr-2"><span className="inline-flex items-center gap-1.5">{r.label}<OppIcon r={r} /></span></td>
                     <td className="px-2 text-right tabular-nums" style={{ color: C.text2 }}>{sharePct(r.demand)}</td>
                     <td className="px-2 text-right tabular-nums" style={{ color: C.text2 }}>{Math.round(r.yielded)}</td>
                     <td className="px-2"><FitBar sold={r.carcassSold} leftover={r.leftover} shortfall={r.shortfall} recovered={r.canSellKg} /></td>
@@ -614,7 +567,6 @@ export function MuttonTool({ d90, d180 }: { d90: MuttonData; d180: MuttonData })
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: C.text2 }}>Methodology &amp; data</div>
           <ul className="mt-3 grid gap-x-10 gap-y-2.5 text-[12.5px] leading-relaxed sm:grid-cols-2" style={{ color: C.text2 }}>
             <Li><b style={{ color: C.text }}>Window</b> — {data.dateMin} to {data.dateMax}; {data.daysWithOrders} of {data.windowDays} days had mutton orders.</Li>
-            <Li><b style={{ color: C.text }}>Vendor baseline</b> — {baselineFootnote}</Li>
             <Li><b style={{ color: C.text }}>Qurbani excluded</b> — {kg(data.qurbaniExcludedKg)} across {data.qurbaniExcludedLines} order lines (festival spikes would distort a steady-state model).</Li>
             <Li><b style={{ color: C.text }}>Unmapped / per-piece SKUs</b>, excluded from the kg model — {data.unmapped.length > 0 ? data.unmapped.slice(0, 4).map((u) => `${u.name.slice(0, 28)} (${kg(u.kg)})`).join("; ") : "none"}.</Li>
             {fatKg > 0 && <Li><b style={{ color: C.text }}>Fat ({kg(fatKg)})</b> is real bulk demand across four &ldquo;Mutton Fat / Charbi&rdquo; SKUs (tallow / rendering buyers) — not a mapping error, so it is kept as-is.</Li>}
@@ -691,7 +643,7 @@ function Li({ children }: { children: React.ReactNode }) {
 
 // Flags a cut where carcass supply and customer demand are badly mismatched — the
 // whole point of the exercise: where can we save money or rebalance the portfolio?
-function OppIcon({ r, mode }: { r: { label: string; demand: number; shortfall: number; yielded: number; leftover: number; eff: number; shortfallCost: number; leftoverValue: number }; mode: "real" | "retail" }) {
+function OppIcon({ r }: { r: { label: string; demand: number; shortfall: number; yielded: number; leftover: number; eff: number; shortfallCost: number; leftoverValue: number } }) {
   if (r.demand < 1) return null;
   const shortPct = r.shortfall / r.demand;
   const overPct = r.yielded > 0 ? r.leftover / r.yielded : 0;
@@ -699,8 +651,7 @@ function OppIcon({ r, mode }: { r: { label: string; demand: number; shortfall: n
   let text = "";
   if (r.shortfall > 50 && shortPct > 0.2 && r.shortfallCost > 150000) {
     color = C.red;
-    const topUp = mode === "real" ? "at the real invoice rate" : `at +${r.eff}%`;
-    text = `Over-demanded: customers want ${Math.round(r.shortfall)} kg more ${r.label} than a balanced carcass yields, so you top up from vendors ${topUp} (${rs(r.shortfallCost)} this window). Opportunity — line up a direct supply for this cut, lift its price, or steer demand toward cuts you over-produce.`;
+    text = `Over-demanded: customers want ${Math.round(r.shortfall)} kg more ${r.label} than a balanced carcass yields, so you top up from vendors at +${r.eff}% (${rs(r.shortfallCost)} this window). Opportunity — line up a direct supply for this cut, lift its price, or steer demand toward cuts you over-produce.`;
   } else if (r.leftover > 50 && overPct > 0.3 && r.leftoverValue > 200000) {
     color = C.amberDark;
     text = `Over-supplied: a balanced carcass yields ${Math.round(r.leftover)} kg of ${r.label} beyond demand (${rs(r.leftoverValue)} at retail). Opportunity — secure a bulk/wholesale buyer, or bundle and discount it to clear instead of wasting it.`;
@@ -736,23 +687,6 @@ function Slider({ label, value, min, max, step, suffix, onChange, fmt }: { label
       </div>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-2 w-full cursor-pointer" style={{ accentColor: C.orange }} />
     </label>
-  );
-}
-
-function Segmented({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { k: string; label: string; tip?: string }[] }) {
-  return (
-    <div className="inline-flex items-center gap-1 rounded-xl border p-1" style={{ borderColor: C.cardBorder, background: C.page }}>
-      {options.map((o) => {
-        const active = o.k === value;
-        return (
-          <button key={o.k} onClick={() => onChange(o.k)} data-tip={o.tip} aria-pressed={active}
-            className="cursor-help rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors"
-            style={active ? { background: C.deep, color: "white" } : { color: C.text2 }}>
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

@@ -2,11 +2,9 @@
 
 All notable changes to the Nizami Farms internal dashboard. Format: date · tab · what changed · why.
 
-## 2026-05-30 · procurement · Real vendor invoice baseline (default)
+## 2026-05-30 · procurement · Reverted real-invoice baseline experiment
 
-Added `lib/vendorRates.ts`, which derives real vendor rates live from `t_fin_vendor_purchase_items` (actual `rate_per_unit` paid to meat vendors) over the same window as the order backtest. Wired into `lib/mutton.ts` (each cut now carries a `vendorRate`; `MuttonData` carries a `vendorRates` summary). Added a baseline-mode toggle to the left column in `components/MuttonTool.tsx`: "Real invoice" (new default) vs "Retail × markup" (the old view, retained for comparison). In real mode the baseline spend and the shortfall buy both use the real rate; the markup slider and per-cut overrides apply only in retail mode. Surfaced real whole-carcass (Rs 2,654/kg) and live-goat (Rs 1,298/kg) anchors beside the in-house cost slider.
-
-Why: the "today" baseline was valuing vendor purchases at Shopify retail × markup, which is the SELL price, not what we pay vendors. The real rate (~Rs 2,463/kg blended over 180d, vs retail Rs 2,950-4,860) sits at or below the in-house carcass cost. Effect: at the unchanged Rs 35k all-in cost the headline flips from +17% saving to −19% loss (180d) / −14% (90d) — in-house is ~Rs 3.0M MORE expensive over 180 days. The retail-derived saving was essentially an artifact of the baseline. Data finding: vendors invoice generic mutton at a single blended rate, not per cut (only Fat has its own rate), so we did not fabricate per-cut vendor prices.
+Reverted the real vendor invoice baseline (commit 98218c4) and returned the procurement tool to its retail × markup baseline. Why: founder opted to keep the original model rather than reframe the headline around real invoice rates. Removed lib/vendorRates.ts and the baseline-mode toggle. The data finding stands for the record (at real invoice rates ~Rs 2,463/kg, in-house slaughter is not cheaper at the current cost assumption), but it is no longer wired into the tool. One small carry-forward: the two `query<>` calls in lib/mutton.ts are kept explicitly typed (not `any`) so `next build` passes on Vercel; this is build hygiene, not a model change.
 
 ## 2026-05-25 · procurement · Routing modal, numbers audit, foundational specs
 
